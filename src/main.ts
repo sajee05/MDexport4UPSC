@@ -4,6 +4,7 @@ import {
 } from "obsidian";
 import { exportPdf } from "./exporter";
 import { injectMath, preprocessMath } from "./math";
+import { renderRemainingMermaid } from "./mermaid";
 import { computeGeometry, DEFAULT_OPTIONS, ExportOptions, MM_TO_PX, PaperName } from "./options";
 
 interface PluginSettings {
@@ -44,10 +45,10 @@ export default class MdExportUpscPlugin extends Plugin {
       opts: { ...DEFAULT_OPTIONS, ...(saved?.opts ?? {}) },
     };
 
-    this.addRibbonIcon("file-output", "Export note to PDF", () => this.openForActive());
+    this.addRibbonIcon("printer", "print UPSC - MD to PDF", () => this.openForActive());
     this.addCommand({
-      id: "export-current-note",
-      name: "Export current note to PDF",
+      id: "print-upsc-md-to-pdf",
+      name: "print UPSC - MD to PDF",
       checkCallback: (checking) => {
         const f = this.app.workspace.getActiveFile();
         if (!f || f.extension !== "md") return false;
@@ -57,7 +58,21 @@ export default class MdExportUpscPlugin extends Plugin {
     });
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
       if (file instanceof TFile && file.extension === "md") {
-        menu.addItem((i) => i.setTitle("Export to PDF").setIcon("file-output").onClick(() => new ExportModal(this.app, this, file).open()));
+        menu.addItem((i) =>
+          i.setTitle("print UPSC - MD to PDF")
+            .setIcon("printer")
+            .onClick(() => new ExportModal(this.app, this, file).open())
+        );
+      }
+    }));
+    this.registerEvent(this.app.workspace.on("editor-menu", (menu, _editor, view) => {
+      const file = view.file;
+      if (file instanceof TFile && file.extension === "md") {
+        menu.addItem((i) =>
+          i.setTitle("print UPSC - MD to PDF")
+            .setIcon("printer")
+            .onClick(() => new ExportModal(this.app, this, file).open())
+        );
       }
     }));
     this.addSettingTab(new ExportSettingTab(this.app, this));
@@ -115,16 +130,23 @@ export default class MdExportUpscPlugin extends Plugin {
   /** Wait for embeds, images, math and diagrams that Obsidian renders asynchronously. */
   private async waitForRender(stage: HTMLElement) {
     try { await finishRenderMath(); } catch { /* not available */ }
-    const deadline = Date.now() + 10000;
-    await sleep(250);
+    const deadline = Date.now() + 2500;
+    await sleep(200);
     while (Date.now() < deadline) {
       const pendingEmbeds = stage.querySelectorAll(".is-loading, .markdown-embed.is-loading").length;
       const pendingMermaid = Array.from(stage.querySelectorAll(".mermaid, .block-language-mermaid")).filter((m) => !m.querySelector("svg")).length;
       const pendingImgs = Array.from(stage.querySelectorAll("img")).filter((i) => !i.complete).length;
       if (!pendingEmbeds && !pendingMermaid && !pendingImgs) break;
-      await sleep(200);
+      await sleep(150);
     }
-    await sleep(150);
+    // Render any remaining unrendered mermaid diagrams into real SVGs
+    try {
+      await renderRemainingMermaid(stage);
+    } catch (e) {
+      console.warn("Error rendering remaining mermaid:", e);
+    }
+    // Remove any lingering .is-loading classes
+    stage.querySelectorAll(".is-loading").forEach((e) => e.classList.remove("is-loading"));
   }
 }
 
@@ -138,7 +160,7 @@ class ExportModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.addClass("mdx-modal");
-    contentEl.createEl("h3", { text: `Export “${this.file.basename}” to PDF` });
+    contentEl.createEl("h3", { text: `print UPSC - MD to PDF: “${this.file.basename}”` });
     const o = this.opts;
 
     const section = (t: string) => contentEl.createEl("h4", { text: t });

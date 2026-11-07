@@ -7,8 +7,8 @@ This is the mobile-friendly successor to a desktop Markdown→PDF script. It nee
 ## Features
 
 - **Real PDF, not screenshots** – text is selectable and searchable, math and diagrams are vector graphics, and files stay small and sharp at any zoom.
-- **LaTeX / MathJax** – `$inline$` and `$$display$$` math is typeset by a bundled MathJax engine (AMS, `\ce{}` chemistry, `\cancel`, `\mathbb`, matrices, cases and more). Invalid formulas are left as source instead of breaking the export.
-- **Obsidian rendering for everything else** – sub/superscripts, arrows, tables, callouts, task lists, footnotes, highlights, code blocks and Mermaid flowcharts match your note.
+- **LaTeX / MathJax** – `$inline$`, `$$display$$`, `\(inline\)` and `\[display\]` math is typeset by a bundled MathJax engine (AMS, matrices, determinants, cases, aligned equations, Greek notation, blackboard bold, physics/economics notation, chemistry, `\cancel`, `\boxed`, etc.). Invalid formulas are left as source instead of breaking the export.
+- **Obsidian & HTML rendering for everything else** – Mermaid flowcharts and sequence diagrams (rendered via built-in engine even if Obsidian doesn't render them in source mode), tables with column alignment, all Obsidian callout styles (note, tip, warning, danger, question, example, abstract, todo, success, info, quote), auto-expanded collapsible callouts and `<details>`, task lists, footnotes, highlights (`==text==` and `<mark>`), `<kbd>`, `<sup>`, `<sub>`, `<abbr>`, nested blockquotes, and code blocks.
 - **Bundled fonts** (Noto Serif/Sans/Mono, plus Devanagari) so output is identical on every device.
 - **Always light and print-ready**, whatever theme you use.
 - **Title page and clickable index** with dotted leaders and page numbers.
@@ -21,9 +21,10 @@ This is the mobile-friendly successor to a desktop Markdown→PDF script. It nee
 
 ## Use
 
-1. Open a note → ribbon icon **Export note to PDF**, or command palette → *Export current note to PDF*, or the file's context menu.
-2. Adjust options → **Export PDF**.
-3. The PDF is saved next to the note (or in the folder set in plugin settings) and opened. On iPad, open the file, tap **Share** and send it to GoodNotes.
+1. Open any note on iPhone, iPad, or desktop.
+2. Tap the note's three-dot menu (`...`) and choose **print UPSC - MD to PDF**, or use the command palette (`print UPSC - MD to PDF`), ribbon icon, or right-click file/editor menu.
+3. Adjust options if desired → **Export PDF**.
+4. The PDF is saved next to the note (or in the folder set in plugin settings) and opened. On iPad/iPhone, tap **Share** and send it directly to GoodNotes or Files.
 
 ## Install
 

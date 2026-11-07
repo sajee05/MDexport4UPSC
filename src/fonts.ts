@@ -72,18 +72,29 @@ export class FontSet {
   /** Register the bundled fonts with the document so the browser lays text out with the exact same glyphs. */
   async loadIntoDocument(): Promise<void> {
     for (const d of DEFS) {
-      const buf = d.data.buffer.slice(d.data.byteOffset, d.data.byteOffset + d.data.byteLength) as ArrayBuffer;
-      const face = new FontFace(CSS_FAMILY[d.family], buf, {
-        weight: d.bold ? "700" : "400", style: d.italic ? "italic" : "normal",
-      });
-      await face.load();
-      (document.fonts as any).add(face);
-      this.faces.push(face);
+      try {
+        const buf = d.data.buffer.slice(d.data.byteOffset, d.data.byteOffset + d.data.byteLength) as ArrayBuffer;
+        const face = new FontFace(CSS_FAMILY[d.family], buf, {
+          weight: d.bold ? "700" : "400", style: d.italic ? "italic" : "normal",
+        });
+        await Promise.race([
+          face.load(),
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error("Font load timeout")), 2000)),
+        ]);
+        if (document.fonts) (document.fonts as any).add(face);
+        this.faces.push(face);
+      } catch (err) {
+        console.warn(`Could not load document font face ${d.key}:`, err);
+      }
     }
   }
 
   unloadFromDocument(): void {
-    this.faces.forEach((f) => (document.fonts as any).delete(f));
+    try {
+      this.faces.forEach((f) => {
+        if (document.fonts) (document.fonts as any).delete(f);
+      });
+    } catch { /* ignore */ }
     this.faces = [];
   }
 

@@ -37,7 +37,11 @@ async function inlineImages(root: HTMLElement, maxDim = 1600): Promise<void> {
     const src = img.currentSrc || img.src;
     if (!src || src.startsWith("data:")) continue;
     try {
-      const blob = await (await fetch(src)).blob();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(src, { signal: controller.signal });
+      clearTimeout(timer);
+      const blob = await resp.blob();
       let url: string;
       if (blob.type.includes("svg")) {
         url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(await blob.text());
@@ -53,7 +57,12 @@ async function inlineImages(root: HTMLElement, maxDim = 1600): Promise<void> {
       }
       img.removeAttribute("srcset");
       img.src = url;
-      try { await img.decode(); } catch { /* ignore */ }
+      try {
+        await Promise.race([
+          img.decode(),
+          new Promise((r) => setTimeout(r, 1000)),
+        ]);
+      } catch { /* ignore */ }
     } catch {
       /* leave the original src; html2canvas may still load it */
     }
@@ -128,6 +137,10 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
 
   try {
     progress("Preparing content…", 0.02);
+    // Expand collapsible callouts and HTML disclosure elements so their contents appear in the PDF
+    content.querySelectorAll(".callout.is-collapsed").forEach((c) => c.classList.remove("is-collapsed"));
+    content.querySelectorAll("details").forEach((d) => d.setAttribute("open", "true"));
+
     await inlineImages(content);
     prepareSvgs(content);
     boxShortBold(content);
@@ -269,7 +282,12 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
       span.style.visibility = "visible";
     });
     await tick();
-    if (document.fonts?.ready) await document.fonts.ready;
+    if (document.fonts?.ready) {
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((r) => setTimeout(r, 1500)),
+      ]);
+    }
 
     // collect links + outline geometry before rasterising
     const links: LinkSpec[] = [];
@@ -313,7 +331,11 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
     for (let i = 0; i < sheets.length; i++) {
       progress(`Writing page ${i + 1} of ${sheets.length}…`, 0.15 + 0.8 * (i / sheets.length));
       const page = pdf.addPage([wPt, hPt]);
-      await new SheetPainter(env, page).paint(sheets[i], wm);
+      try {
+        await new SheetPainter(env, page).paint(sheets[i], wm);
+      } catch (err) {
+        console.warn(`Error painting page ${i + 1}:`, err);
+      }
       pages.push(page);
       sheets[i].remove();
       await tick();

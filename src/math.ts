@@ -73,7 +73,8 @@ function convertBlock(text: string): string {
   const n = text.length;
   while (i < n) {
     const c = text[i];
-    if (c === "\\" && i + 1 < n) { res += c + text[i + 1]; i += 2; continue; }
+
+    // Inline code: `...`
     if (c === "`") {
       let j = i; while (j < n && text[j] === "`") j++;
       const run = text.slice(i, j);
@@ -83,6 +84,57 @@ function convertBlock(text: string): string {
       i = close + run.length;
       continue;
     }
+
+    // Display math: \[ ... \]
+    if (c === "\\" && text[i + 1] === "[") {
+      let j = i + 2, end = -1;
+      while (j < n - 1) {
+        if (text[j] === "\\") {
+          if (text[j + 1] === "]") { end = j; break; }
+          j += 2;
+          continue;
+        }
+        j++;
+      }
+      if (end !== -1) {
+        let tex = text.slice(i + 2, end);
+        const lineStart = text.lastIndexOf("\n", i - 1) + 1;
+        if (/^\s*>/.test(text.slice(lineStart, i))) tex = tex.replace(/\n\s*(>\s?)+/g, "\n");
+        res += placeholder(tex.trim(), true);
+        i = end + 2;
+        continue;
+      }
+    }
+
+    // Inline math: \( ... \)
+    if (c === "\\" && text[i + 1] === "(") {
+      let j = i + 2, end = -1;
+      while (j < n - 1) {
+        if (text[j] === "\\") {
+          if (text[j + 1] === ")") { end = j; break; }
+          j += 2;
+          continue;
+        }
+        j++;
+      }
+      if (end !== -1) {
+        let tex = text.slice(i + 2, end);
+        const lineStart = text.lastIndexOf("\n", i - 1) + 1;
+        if (/^\s*>/.test(text.slice(lineStart, i))) tex = tex.replace(/\n\s*(>\s?)+/g, "\n");
+        res += placeholder(tex.trim(), false);
+        i = end + 2;
+        continue;
+      }
+    }
+
+    // Escaped characters (e.g. \$)
+    if (c === "\\" && i + 1 < n) {
+      res += c + text[i + 1];
+      i += 2;
+      continue;
+    }
+
+    // MathJax $$ ... $$
     if (c === "$") {
       if (text[i + 1] === "$") {
         let j = i + 2, end = -1;
@@ -101,7 +153,7 @@ function convertBlock(text: string): string {
         }
         res += "$$"; i += 2; continue;
       }
-      // inline: $x$ with non-space just inside the delimiters, closing $ not followed by a digit
+      // Inline math: $ ... $ with non-space inside delimiters
       if (i + 1 < n && !/\s/.test(text[i + 1])) {
         let j = i + 1, end = -1;
         while (j < n) {
@@ -135,10 +187,12 @@ export function injectMath(root: HTMLElement): number {
       const tmp = document.createElement("div");
       tmp.innerHTML = texToSvgHtml(tex, display);
       el = tmp.firstElementChild as HTMLElement;
-    } catch {
+    } catch (e) {
       failed++;
+      console.warn("MathJax failed to typeset formula:", tex, e);
       el = document.createElement("code");
-      el.textContent = display ? `$$${tex}$$` : `$${tex}$`;
+      el.className = "mdx-math-fallback";
+      el.textContent = display ? `\\[${tex}\\]` : `\\(${tex}\\)`;
     }
     const parent = ph.parentElement;
     if (display && parent && parent.tagName === "P" && parent.childNodes.length === 1) parent.replaceWith(el);
