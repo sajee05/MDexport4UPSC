@@ -1,5 +1,5 @@
 import {
-  App, Component, MarkdownRenderer, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder,
+  App, Component, MarkdownRenderer, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder,
   finishRenderMath, normalizePath,
 } from "obsidian";
 import { exportPdf } from "./exporter";
@@ -57,25 +57,58 @@ export default class MdExportUpscPlugin extends Plugin {
         return true;
       },
     });
+
+    // File context menu & more-options on desktop & mobile
     this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
-      if (file instanceof TFile && file.extension === "md") {
+      const f = file instanceof TFile ? file : this.app.workspace.getActiveFile();
+      if (f instanceof TFile && f.extension === "md") {
         menu.addItem((i) =>
           i.setTitle("print UPSC - MD to PDF")
             .setIcon("printer")
-            .onClick(() => new ExportModal(this.app, this, file).open())
+            .onClick(() => new ExportModal(this.app, this, f).open())
         );
       }
     }));
+
+    // Editor context menu
     this.registerEvent(this.app.workspace.on("editor-menu", (menu, _editor, view) => {
-      const file = view.file;
-      if (file instanceof TFile && file.extension === "md") {
+      const f = (view instanceof MarkdownView ? view.file : (view as any)?.file) || this.app.workspace.getActiveFile();
+      if (f instanceof TFile && f.extension === "md") {
         menu.addItem((i) =>
           i.setTitle("print UPSC - MD to PDF")
             .setIcon("printer")
-            .onClick(() => new ExportModal(this.app, this, file).open())
+            .onClick(() => new ExportModal(this.app, this, f).open())
         );
       }
     }));
+
+    // Three-dot header menu on iPad / iPhone
+    this.registerEvent((this.app.workspace as any).on("page-header-menu", (menu: any, view: any) => {
+      const f = view?.file || this.app.workspace.getActiveFile();
+      if (f instanceof TFile && f.extension === "md") {
+        menu.addItem((i: any) =>
+          i.setTitle("print UPSC - MD to PDF")
+            .setIcon("printer")
+            .onClick(() => new ExportModal(this.app, this, f).open())
+        );
+      }
+    }));
+
+    // Also add action icon to note header bar (shows in top bar or in three dots on narrow screens)
+    const addActionToView = (view: any) => {
+      if (view instanceof MarkdownView && !(view as any)._mdxPrintActionAdded) {
+        (view as any)._mdxPrintActionAdded = true;
+        view.addAction("printer", "print UPSC - MD to PDF", () => {
+          const f = view.file || this.app.workspace.getActiveFile();
+          if (f && f.extension === "md") new ExportModal(this.app, this, f).open();
+        });
+      }
+    };
+    this.app.workspace.iterateAllLeaves((l) => addActionToView(l.view));
+    this.registerEvent(this.app.workspace.on("active-leaf-change", (l) => {
+      if (l) addActionToView(l.view);
+    }));
+
     this.addSettingTab(new ExportSettingTab(this.app, this));
   }
 
@@ -96,16 +129,7 @@ export default class MdExportUpscPlugin extends Plugin {
     const stage = document.body.createDiv({ cls: "markdown-rendered theme-light mdx-render-stage" });
     stage.style.cssText = `position:fixed;left:0;top:0;z-index:-1;width:${Math.round(g.contentWmm * MM_TO_PX)}px;pointer-events:none;`;
 
-    // Load custom fonts into the browser document so layout metrics match the PDF exactly.
-    // On iOS WebKit, fonts are NOT pre-cached — this is mandatory.
     const fonts = new FontSet();
-    try {
-      await onProgress("Loading fonts…", 0.005);
-      await fonts.loadIntoDocument();
-    } catch (fontErr) {
-      console.warn("Font pre-load partially failed:", fontErr);
-    }
-
     try {
       await onProgress("Rendering note…", 0.01);
       const raw = await this.app.vault.cachedRead(file);
@@ -138,28 +162,31 @@ export default class MdExportUpscPlugin extends Plugin {
     } finally {
       comp.unload();
       stage.remove();
-      fonts.unloadFromDocument();
       this.busy = false;
     }
   }
 
   /**
    * Wait for Obsidian embeds, images, math, and Mermaid diagrams.
-   * iOS WebKit can be very slow — we poll for up to 10 seconds instead of a fixed 400ms.
+   * Uses safe bounded timeouts so export NEVER hangs on mobile.
    */
   private async waitForRender(stage: HTMLElement) {
-    // 1. Let Obsidian's own math renderer finish first.
-    try { await finishRenderMath(); } catch { /* not available on mobile */ }
+    // 1. Let Obsidian's own math renderer finish (bounded timeout so it never hangs).
+    try {
+      await Promise.race([
+        finishRenderMath(),
+        new Promise<void>((r) => setTimeout(r, 300)),
+      ]);
+    } catch { /* not available on mobile or timed out */ }
 
-    // 2. Poll for embeds + images to finish loading (up to 10 s, 150 ms intervals).
-    const DEADLINE = Date.now() + 10_000;
+    // 2. Poll for embeds + images to finish loading (up to 1.5 s, 100 ms intervals).
+    const DEADLINE = Date.now() + 1500;
     while (Date.now() < DEADLINE) {
       const pendingEmbeds = stage.querySelectorAll(".markdown-embed.is-loading").length;
       const pendingImgs = Array.from(stage.querySelectorAll("img")).filter((i) => !i.complete).length;
-      // Also wait for Obsidian's native math containers that are still loading.
       const pendingMath = stage.querySelectorAll(".math.is-loading, .MathJax_Processing").length;
       if (!pendingEmbeds && !pendingImgs && !pendingMath) break;
-      await sleep(150);
+      await sleep(100);
     }
 
     // 3. Render remaining Mermaid diagrams (Obsidian may not have rendered them on mobile).
@@ -173,7 +200,7 @@ export default class MdExportUpscPlugin extends Plugin {
     stage.querySelectorAll(".is-loading").forEach((e) => e.classList.remove("is-loading"));
 
     // 5. Final yield so the browser can reflow any newly injected nodes.
-    await sleep(80);
+    await sleep(50);
   }
 }
 

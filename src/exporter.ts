@@ -6,7 +6,7 @@ import { Flow } from "./flow";
 import { buildCss } from "./styles-pdf";
 import { computeGeometry, ExportOptions, MM_TO_PT, MM_TO_PX } from "./options";
 
-export type Progress = (msg: string, fraction: number) => void;
+export type Progress = (msg: string, fraction: number) => void | Promise<void>;
 
 interface LinkSpec {
   sheet: number;
@@ -127,10 +127,6 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
   const ky = (g.sheetHmm * MM_TO_PT) / sheetH;
 
   const fonts = preloadedFonts ?? new FontSet();
-  // If fonts weren't pre-loaded (e.g., called standalone), load them now.
-  if (!preloadedFonts) {
-    try { await fonts.loadIntoDocument(); } catch (e) { console.warn("Font load warning:", e); }
-  }
   const root = el("div", "mdx-root theme-light");
   const style = el("style");
   style.textContent = buildCss(opts, g);
@@ -138,7 +134,7 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
   document.body.appendChild(root);
 
   try {
-    progress("Preparing content…", 0.02);
+    await progress("Preparing content…", 0.02);
     // Expand collapsible callouts and HTML disclosure elements so their contents appear in the PDF
     content.querySelectorAll(".callout.is-collapsed").forEach((c) => c.classList.remove("is-collapsed"));
     content.querySelectorAll("details").forEach((d) => d.setAttribute("open", "true"));
@@ -211,7 +207,7 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
     }
 
     // paginate
-    progress("Laying out pages…", 0.1);
+    await progress("Laying out pages…", 0.1);
     const stage = el("div");
     stage.style.cssText = `position:absolute;left:0;top:0;`;
     root.appendChild(stage);
@@ -325,7 +321,7 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
     const wm = opts.watermark.trim() ? { text: opts.watermark, size: opts.wmSize, opacity: opts.wmOpacity } : null;
 
     for (let i = 0; i < sheets.length; i++) {
-      progress(`Writing page ${i + 1} of ${sheets.length}…`, 0.15 + 0.8 * (i / sheets.length));
+      await progress(`Writing page ${i + 1} of ${sheets.length}…`, 0.15 + 0.8 * (i / sheets.length));
       const page = pdf.addPage([wPt, hPt]);
       try {
         await new SheetPainter(env, page).paint(sheets[i], wm);
@@ -334,7 +330,8 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
       }
       pages.push(page);
       sheets[i].remove();
-      await tick();
+      // Yield to WebKit runloop so UI repaints on mobile
+      await new Promise<void>((r) => setTimeout(r, 20));
     }
 
     // link annotations
@@ -355,7 +352,7 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
     annots.forEach((refs, si) => pages[si].node.set(PDFName.of("Annots"), ctx.obj(refs)));
 
     addOutline(pdf, pages, outline, hPt, ky);
-    progress("Saving PDF…", 0.97);
+    await progress("Saving PDF…", 0.97);
     return await pdf.save();
   } finally {
     root.remove();

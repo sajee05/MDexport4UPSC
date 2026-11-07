@@ -593,13 +593,16 @@ export class SheetPainter {
   }
 
   private async svgMarkers(el: Element, cs: CSSStyleDeclaration, segs: Seg[], ctm: M6, op: number, sw: number) {
+    if (el.closest("marker")) return;
     const ep = endpoints(segs);
     if (!ep) return;
     const url = (v: string) => { const m = /url\(["']?#([^"')]+)["']?\)/.exec(v); return m ? m[1] : null; };
     const root = (el as SVGElement).ownerSVGElement || el.closest("svg");
     if (!root) return;
+    const visited = new Set<string>();
     const draw = async (id: string | null, p: [number, number, number]) => {
-      if (!id) return;
+      if (!id || visited.has(id)) return;
+      visited.add(id);
       const mk = (root as Element).querySelector(`[id="${CSS.escape(id)}"]`) as Element | null;
       if (!mk) return;
       const mw = parseFloat(mk.getAttribute("markerWidth") || "3"), mh = parseFloat(mk.getAttribute("markerHeight") || "3");

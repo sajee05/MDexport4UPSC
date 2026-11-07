@@ -8,8 +8,7 @@ async function getMermaidInstance(): Promise<any> {
     if (typeof loadMermaid === "function") {
       const m = await Promise.race([
         loadMermaid(),
-        // iOS WebKit can be slow; give it 4 seconds instead of 800ms.
-        new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+        new Promise<null>((r) => setTimeout(() => r(null), 1500)),
       ]);
       if (m) return m;
     }
@@ -68,8 +67,7 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
         const id = "mdx-mmd-" + Math.random().toString(36).slice(2, 9);
         const res = await Promise.race([
           mermaid.render(id, code),
-          // iOS can be slow to render SVG diagrams; give it 6 seconds.
-          new Promise<null>((r) => setTimeout(() => r(null), 6000)),
+          new Promise<null>((r) => setTimeout(() => r(null), 1500)),
         ]);
         const svg = typeof res === "string" ? res : res?.svg;
         if (svg) {
