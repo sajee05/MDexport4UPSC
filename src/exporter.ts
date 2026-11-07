@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PDFDocument, PDFHexString, PDFName, PDFPage, PDFRef, PDFString } from "pdf-lib";
 import { FontSet, fontkit } from "./fonts";
 import { SheetPainter } from "./vector";
@@ -118,7 +117,7 @@ function normalize(s: string): string {
 /* Main                                                               */
 /* ------------------------------------------------------------------ */
 
-export async function exportPdf(content: HTMLElement, opts: ExportOptions, progress: Progress = () => {}): Promise<Uint8Array> {
+export async function exportPdf(content: HTMLElement, opts: ExportOptions, progress: Progress = () => {}, preloadedFonts?: FontSet): Promise<Uint8Array> {
   const g = computeGeometry(opts);
   const sheetW = Math.round(g.sheetWmm * MM_TO_PX);
   const sheetH = Math.round(g.sheetHmm * MM_TO_PX);
@@ -127,7 +126,11 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
   const kx = (g.sheetWmm * MM_TO_PT) / sheetW; // css px -> pt
   const ky = (g.sheetHmm * MM_TO_PT) / sheetH;
 
-  const fonts = new FontSet();
+  const fonts = preloadedFonts ?? new FontSet();
+  // If fonts weren't pre-loaded (e.g., called standalone), load them now.
+  if (!preloadedFonts) {
+    try { await fonts.loadIntoDocument(); } catch (e) { console.warn("Font load warning:", e); }
+  }
   const root = el("div", "mdx-root theme-light");
   const style = el("style");
   style.textContent = buildCss(opts, g);

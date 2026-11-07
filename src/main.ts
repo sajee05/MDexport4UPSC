@@ -6,6 +6,7 @@ import { exportPdf } from "./exporter";
 import { injectMath, preprocessMath } from "./math";
 import { renderRemainingMermaid } from "./mermaid";
 import { computeGeometry, DEFAULT_OPTIONS, ExportOptions, MM_TO_PX, PaperName } from "./options";
+import { FontSet } from "./fonts";
 
 interface PluginSettings {
   opts: ExportOptions;
@@ -94,6 +95,17 @@ export default class MdExportUpscPlugin extends Plugin {
     const g = computeGeometry(opts);
     const stage = document.body.createDiv({ cls: "markdown-rendered theme-light mdx-render-stage" });
     stage.style.cssText = `position:fixed;left:0;top:0;z-index:-1;width:${Math.round(g.contentWmm * MM_TO_PX)}px;pointer-events:none;`;
+
+    // Load custom fonts into the browser document so layout metrics match the PDF exactly.
+    // On iOS WebKit, fonts are NOT pre-cached — this is mandatory.
+    const fonts = new FontSet();
+    try {
+      await onProgress("Loading fonts…", 0.005);
+      await fonts.loadIntoDocument();
+    } catch (fontErr) {
+      console.warn("Font pre-load partially failed:", fontErr);
+    }
+
     try {
       await onProgress("Rendering note…", 0.01);
       const raw = await this.app.vault.cachedRead(file);
@@ -105,9 +117,12 @@ export default class MdExportUpscPlugin extends Plugin {
       };
       await MarkdownRenderer.render(this.app, preprocessMath(body), stage, file.path, comp);
       await this.waitForRender(stage);
-      const badMath = injectMath(stage);
+      await onProgress("Typesetting math…", 0.07);
+      const badMath = await injectMath(stage);
       if (badMath) new Notice(`${badMath} formula(s) could not be typeset and were left as source.`);
-      const bytes = await exportPdf(stage, eff, onProgress);
+      // Yield to the event loop so iOS WebKit reflows the new SVG nodes before we measure.
+      await sleep(50);
+      const bytes = await exportPdf(stage, eff, onProgress, fonts);
 
       const dir = this.settings.outputFolder.trim() || file.parent?.path || "";
       if (dir && dir !== "/" && !this.app.vault.getAbstractFileByPath(normalizePath(dir))) {
@@ -123,28 +138,42 @@ export default class MdExportUpscPlugin extends Plugin {
     } finally {
       comp.unload();
       stage.remove();
+      fonts.unloadFromDocument();
       this.busy = false;
     }
   }
 
-  /** Wait for embeds, images, math and diagrams that Obsidian renders asynchronously. */
+  /**
+   * Wait for Obsidian embeds, images, math, and Mermaid diagrams.
+   * iOS WebKit can be very slow — we poll for up to 10 seconds instead of a fixed 400ms.
+   */
   private async waitForRender(stage: HTMLElement) {
-    try { await finishRenderMath(); } catch { /* not available */ }
-    const deadline = Date.now() + 400;
-    while (Date.now() < deadline) {
+    // 1. Let Obsidian's own math renderer finish first.
+    try { await finishRenderMath(); } catch { /* not available on mobile */ }
+
+    // 2. Poll for embeds + images to finish loading (up to 10 s, 150 ms intervals).
+    const DEADLINE = Date.now() + 10_000;
+    while (Date.now() < DEADLINE) {
       const pendingEmbeds = stage.querySelectorAll(".markdown-embed.is-loading").length;
       const pendingImgs = Array.from(stage.querySelectorAll("img")).filter((i) => !i.complete).length;
-      if (!pendingEmbeds && !pendingImgs) break;
-      await sleep(100);
+      // Also wait for Obsidian's native math containers that are still loading.
+      const pendingMath = stage.querySelectorAll(".math.is-loading, .MathJax_Processing").length;
+      if (!pendingEmbeds && !pendingImgs && !pendingMath) break;
+      await sleep(150);
     }
-    // Render any remaining unrendered mermaid diagrams into real SVGs
+
+    // 3. Render remaining Mermaid diagrams (Obsidian may not have rendered them on mobile).
     try {
       await renderRemainingMermaid(stage);
     } catch (e) {
       console.warn("Error rendering remaining mermaid:", e);
     }
-    // Remove any lingering .is-loading classes
+
+    // 4. Remove any lingering .is-loading classes so the export never hangs on them.
     stage.querySelectorAll(".is-loading").forEach((e) => e.classList.remove("is-loading"));
+
+    // 5. Final yield so the browser can reflow any newly injected nodes.
+    await sleep(80);
   }
 }
 

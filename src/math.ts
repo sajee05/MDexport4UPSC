@@ -176,10 +176,15 @@ function convertBlock(text: string): string {
   return res;
 }
 
-/** Swap placeholders for typeset SVG. Invalid TeX is shown as monospace source instead of failing the export. */
-export function injectMath(root: HTMLElement): number {
+/** Swap placeholders for typeset SVG. Invalid TeX is shown as monospace source instead of failing the export.
+ *  Async so we can yield to the event loop periodically — critical on iOS to avoid JS timeout. */
+export async function injectMath(root: HTMLElement): Promise<number> {
   let failed = 0;
-  root.querySelectorAll<HTMLElement>("[data-mdx-math]").forEach((ph) => {
+  const placeholders = Array.from(root.querySelectorAll<HTMLElement>("[data-mdx-math]"));
+  for (let i = 0; i < placeholders.length; i++) {
+    // Yield every 10 equations so iOS WebKit doesn't time out the script.
+    if (i > 0 && i % 10 === 0) await new Promise<void>((r) => setTimeout(r, 0));
+    const ph = placeholders[i];
     const display = ph.getAttribute("data-display") === "1";
     const tex = dec(ph.getAttribute("data-mdx-math") || "");
     let el: HTMLElement;
@@ -197,6 +202,6 @@ export function injectMath(root: HTMLElement): number {
     const parent = ph.parentElement;
     if (display && parent && parent.tagName === "P" && parent.childNodes.length === 1) parent.replaceWith(el);
     else ph.replaceWith(el);
-  });
+  }
   return failed;
 }
