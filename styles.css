@@ -1,0 +1,16 @@
+.mdx-modal h4 {
+  margin: 1.1em 0 0.2em;
+  font-size: var(--font-ui-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.mdx-modal .mdx-status {
+  min-height: 1.4em;
+  margin-top: 1em;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+.mdx-modal .mdx-progress {
+  width: 100%;
+}

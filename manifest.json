@@ -1,0 +1,10 @@
+{
+  "id": "md-export-for-upsc",
+  "name": "MD Export for UPSC",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "Export notes to book-style PDFs with correct math, callouts, diagrams, index and a scratchpad margin. Works on iPad.",
+  "author": "sajee05",
+  "authorUrl": "https://github.com/sajee05",
+  "isDesktopOnly": false
+}
