@@ -426,7 +426,8 @@ export class SheetPainter {
       try {
         const sc = 4, pad = 2;
         const c = document.createElement("canvas");
-        c.width = Math.ceil(r.width * sc) + pad * 2; c.height = Math.ceil(r.height * sc) + pad * 2;
+        c.width = Math.max(1, Math.ceil(r.width * sc) + pad * 2);
+        c.height = Math.max(1, Math.ceil(r.height * sc) + pad * 2);
         const g = c.getContext("2d")!;
         g.font = `${cs.fontStyle} ${cs.fontWeight} ${sizePx * sc}px ${cs.fontFamily}`;
         g.textBaseline = "alphabetic";
@@ -434,8 +435,12 @@ export class SheetPainter {
         const fm = g.measureText(str);
         const asc = (fm as TextMetrics & { fontBoundingBoxAscent?: number }).fontBoundingBoxAscent;
         g.fillText(str, pad, pad + (asc !== undefined ? Math.round(asc) : r.height * sc * 0.8));
-        const png = await new Promise<Blob | null>((res) => c.toBlob(res, "image/png"));
-        img = png ? await this.env.pdf.embedPng(new Uint8Array(await png.arrayBuffer())) : null;
+        const dataUrl = c.toDataURL("image/png");
+        const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+        const bin = atob(b64);
+        const u = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+        img = await this.env.pdf.embedPng(u);
       } catch { img = null; }
       this.glyphCache.set(key, img);
     }
@@ -466,8 +471,12 @@ export class SheetPainter {
           const s = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
           c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
           c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-          const blob = await new Promise<Blob | null>((res) => c.toBlob(res, "image/png"));
-          if (blob) pdfImg = await this.env.pdf.embedPng(new Uint8Array(await blob.arrayBuffer()));
+          const dataUrl = c.toDataURL("image/png");
+          const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+          const bin = atob(b64);
+          const u = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+          pdfImg = await this.env.pdf.embedPng(u);
         }
       } catch { pdfImg = null; }
       this.imgCache.set(src, pdfImg);

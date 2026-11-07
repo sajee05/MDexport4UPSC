@@ -128,7 +128,6 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
   const ky = (g.sheetHmm * MM_TO_PT) / sheetH;
 
   const fonts = new FontSet();
-  await fonts.loadIntoDocument();
   const root = el("div", "mdx-root theme-light");
   const style = el("style");
   style.textContent = buildCss(opts, g);
@@ -282,12 +281,6 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
       span.style.visibility = "visible";
     });
     await tick();
-    if (document.fonts?.ready) {
-      await Promise.race([
-        document.fonts.ready,
-        new Promise((r) => setTimeout(r, 1500)),
-      ]);
-    }
 
     // collect links + outline geometry before rasterising
     const links: LinkSpec[] = [];
@@ -363,7 +356,6 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
     return await pdf.save();
   } finally {
     root.remove();
-    fonts.unloadFromDocument();
   }
 }
 

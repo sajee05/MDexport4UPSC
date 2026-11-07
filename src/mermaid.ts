@@ -2,17 +2,20 @@ import { loadMermaid } from "obsidian";
 
 async function getMermaidInstance(): Promise<any> {
   try {
+    if (typeof (window as any).mermaid !== "undefined") {
+      return (window as any).mermaid;
+    }
     if (typeof loadMermaid === "function") {
-      const m = await loadMermaid();
+      const m = await Promise.race([
+        loadMermaid(),
+        new Promise<null>((r) => setTimeout(() => r(null), 800)),
+      ]);
       if (m) return m;
     }
   } catch (e) {
     console.warn("loadMermaid() call failed:", e);
   }
-  if (typeof (window as any).mermaid !== "undefined") {
-    return (window as any).mermaid;
-  }
-  return null;
+  return (window as any).mermaid || null;
 }
 
 export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> {
@@ -29,6 +32,11 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
   if (!candidates.length) return;
 
   let mermaid: any = null;
+  try {
+    mermaid = await getMermaidInstance();
+  } catch {
+    mermaid = null;
+  }
 
   for (const el of candidates) {
     if (el.querySelector("svg")) {
@@ -45,10 +53,7 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
       continue;
     }
 
-    if (!mermaid) {
-      mermaid = await getMermaidInstance();
-    }
-
+    let rendered = false;
     if (mermaid) {
       try {
         if (typeof mermaid.initialize === "function") {
@@ -60,13 +65,17 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
           });
         }
         const id = "mdx-mmd-" + Math.random().toString(36).slice(2, 9);
-        const res = await mermaid.render(id, code);
+        const res = await Promise.race([
+          mermaid.render(id, code),
+          new Promise<null>((r) => setTimeout(() => r(null), 1200)),
+        ]);
         const svg = typeof res === "string" ? res : res?.svg;
         if (svg) {
           const container = document.createElement("div");
           container.className = "mermaid block-language-mermaid";
           container.innerHTML = svg;
           el.replaceWith(container);
+          rendered = true;
           continue;
         }
       } catch (err) {
@@ -74,12 +83,20 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
       }
     }
 
-    // Fallback: don't leave .is-loading or broken DOM
-    el.classList.remove("is-loading");
-    if (!el.classList.contains("mermaid")) el.classList.add("mermaid");
+    if (!rendered) {
+      // Fallback: render clean formatted code block so layout never breaks or hangs
+      const fallback = document.createElement("div");
+      fallback.className = "mermaid block-language-mermaid";
+      const pre = document.createElement("pre");
+      pre.style.cssText = "font-size:12px;text-align:left;background:#fbf9f4;padding:12px;border:1px solid #ddd3bf;border-radius:6px;margin:0;";
+      const codeEl = document.createElement("code");
+      codeEl.textContent = code;
+      pre.appendChild(codeEl);
+      fallback.appendChild(pre);
+      el.replaceWith(fallback);
+    }
   }
 
   // Remove any remaining .is-loading anywhere in stage
   stage.querySelectorAll(".is-loading").forEach((e) => e.classList.remove("is-loading"));
 }
-

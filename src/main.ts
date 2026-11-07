@@ -86,7 +86,7 @@ export default class MdExportUpscPlugin extends Plugin {
 
   async saveSettings() { await this.saveData(this.settings); }
 
-  async runExport(file: TFile, opts: ExportOptions, onProgress: (m: string, f: number) => void): Promise<TFile> {
+  async runExport(file: TFile, opts: ExportOptions, onProgress: (m: string, f: number) => void | Promise<void>): Promise<TFile> {
     if (this.busy) throw new Error("An export is already running.");
     this.busy = true;
     const comp = new Component();
@@ -95,7 +95,7 @@ export default class MdExportUpscPlugin extends Plugin {
     const stage = document.body.createDiv({ cls: "markdown-rendered theme-light mdx-render-stage" });
     stage.style.cssText = `position:fixed;left:0;top:0;z-index:-1;width:${Math.round(g.contentWmm * MM_TO_PX)}px;pointer-events:none;`;
     try {
-      onProgress("Rendering note…", 0.01);
+      await onProgress("Rendering note…", 0.01);
       const raw = await this.app.vault.cachedRead(file);
       const { body, meta } = splitFrontmatter(raw);
       const eff: ExportOptions = {
@@ -130,14 +130,12 @@ export default class MdExportUpscPlugin extends Plugin {
   /** Wait for embeds, images, math and diagrams that Obsidian renders asynchronously. */
   private async waitForRender(stage: HTMLElement) {
     try { await finishRenderMath(); } catch { /* not available */ }
-    const deadline = Date.now() + 2500;
-    await sleep(200);
+    const deadline = Date.now() + 400;
     while (Date.now() < deadline) {
-      const pendingEmbeds = stage.querySelectorAll(".is-loading, .markdown-embed.is-loading").length;
-      const pendingMermaid = Array.from(stage.querySelectorAll(".mermaid, .block-language-mermaid")).filter((m) => !m.querySelector("svg")).length;
+      const pendingEmbeds = stage.querySelectorAll(".markdown-embed.is-loading").length;
       const pendingImgs = Array.from(stage.querySelectorAll("img")).filter((i) => !i.complete).length;
-      if (!pendingEmbeds && !pendingMermaid && !pendingImgs) break;
-      await sleep(150);
+      if (!pendingEmbeds && !pendingImgs) break;
+      await sleep(100);
     }
     // Render any remaining unrendered mermaid diagrams into real SVGs
     try {
@@ -207,10 +205,21 @@ class ExportModal extends Modal {
         try {
           this.plugin.settings.opts = { ...o, title: "", subtitle: "" };
           await this.plugin.saveSettings();
-          const out = await this.plugin.runExport(this.file, o, (m, f) => { status.setText(m); bar.value = f; });
-          new Notice(`Saved ${out.path}`);
+          const out = await this.plugin.runExport(this.file, o, async (m, f) => {
+            status.setText(m);
+            bar.value = f;
+            await sleep(20); // Yield so mobile WebKit repaints status & progress bar
+          });
+          new Notice(`Saved ${out.path}`, 6000);
           this.close();
-          if (this.plugin.settings.openAfterExport) await this.app.workspace.getLeaf(true).openFile(out);
+          if (this.plugin.settings.openAfterExport) {
+            try {
+              const leaf = this.app.workspace.getLeaf(false);
+              await leaf.openFile(out);
+            } catch (openErr) {
+              console.warn("Could not auto-open PDF in leaf:", openErr);
+            }
+          }
         } catch (e) {
           console.error(e);
           status.setText(`Failed: ${(e as Error).message}`);
