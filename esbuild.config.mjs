@@ -13,6 +13,7 @@ const ctx = await esbuild.context({
   sourcemap: prod ? false : "inline",
   minify: prod,
   treeShaking: true,
+  loader: { ".ttf": "binary" },
   outfile: "main.js",
 });
 

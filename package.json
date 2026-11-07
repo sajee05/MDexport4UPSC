@@ -1,6 +1,6 @@
 {
   "name": "md-export-for-upsc",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Export Obsidian notes to book-style PDFs (math, callouts, diagrams, TOC, scratchpad margin) on iPad, iPhone and desktop.",
   "main": "main.js",
   "scripts": {
@@ -8,7 +8,13 @@
     "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
-  "keywords": ["obsidian", "obsidian-plugin", "pdf", "export", "ipad"],
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "pdf",
+    "export",
+    "ipad"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.11.0",
@@ -19,7 +25,9 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "html2canvas": "1.4.1",
-    "pdf-lib": "1.17.1"
+    "@pdf-lib/fontkit": "^1.1.1",
+    "mathjax-full": "^3.2.2",
+    "pdf-lib": "1.17.1",
+    "regenerator-runtime": "^0.14.1"
   }
 }

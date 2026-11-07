@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import html2canvas from "html2canvas";
 import { PDFDocument, PDFHexString, PDFName, PDFPage, PDFRef, PDFString } from "pdf-lib";
+import { FontSet, fontkit } from "./fonts";
+import { SheetPainter } from "./vector";
 import { FOOTER_LABEL, FOOTER_URL } from "./constants";
 import { Flow } from "./flow";
 import { buildCss } from "./styles-pdf";
@@ -88,15 +89,6 @@ function prepareSvgs(root: HTMLElement): void {
       });
       fo.replaceWith(t);
     });
-    (svg as unknown as HTMLElement).style.color = getComputedStyle(svg).color;
-    if (svg.classList.contains("svg-icon") || svg.closest(".callout-icon")) {
-      const cs = getComputedStyle(svg);
-      svg.setAttribute("fill", "none");
-      svg.setAttribute("stroke", cs.color);
-      svg.setAttribute("stroke-width", cs.strokeWidth && cs.strokeWidth !== "0px" ? cs.strokeWidth : "2");
-      svg.setAttribute("stroke-linecap", "round");
-      svg.setAttribute("stroke-linejoin", "round");
-    }
   });
 }
 
@@ -126,6 +118,8 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
   const kx = (g.sheetWmm * MM_TO_PT) / sheetW; // css px -> pt
   const ky = (g.sheetHmm * MM_TO_PT) / sheetH;
 
+  const fonts = new FontSet();
+  await fonts.loadIntoDocument();
   const root = el("div", "mdx-root theme-light");
   const style = el("style");
   style.textContent = buildCss(opts, g);
@@ -249,11 +243,6 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
         lab.style.cssText = `left:${x}px;width:${sheetW - x}px;top:46px;`;
         sheet.append(line, lab);
       }
-      if (opts.watermark.trim()) {
-        const wm = el("div", "mdx-wm");
-        wm.appendChild(el("span", "", opts.watermark.trim()));
-        sheet.appendChild(wm);
-      }
       // footer: title (left) | page (centre) | hard-coded link (right)
       const foot = el("div", "mdx-footer");
       foot.appendChild(el("div", "l", opts.title));
@@ -311,28 +300,22 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
       .map((h) => { const t = byId(h.id); if (!t) return null; const p = posOf(t); return { ...h, sheet: p.sheet, y: p.y }; })
       .filter((x): x is HeadingInfo & { sheet: number; y: number } => !!x);
 
-    // rasterise -> PDF
+    // paint -> PDF (real text + vectors)
     const pdf = await PDFDocument.create();
+    pdf.registerFontkit(fontkit as never);
     pdf.setCreator("MD Export for UPSC");
     if (opts.title) pdf.setTitle(opts.title);
     const pages: PDFPage[] = [];
     const wPt = g.sheetWmm * MM_TO_PT, hPt = g.sheetHmm * MM_TO_PT;
-    const scale = Math.max(1, Math.min(opts.quality, Math.sqrt(13_000_000 / (sheetW * sheetH))));
+    const env = { pdf, fonts, hPt, kx, ky };
+    const wm = opts.watermark.trim() ? { text: opts.watermark, size: opts.wmSize, opacity: opts.wmOpacity } : null;
 
     for (let i = 0; i < sheets.length; i++) {
-      progress(`Rendering page ${i + 1} of ${sheets.length}…`, 0.15 + 0.8 * (i / sheets.length));
-      const canvas = await html2canvas(sheets[i], {
-        scale, backgroundColor: "#ffffff", useCORS: true, logging: false,
-        width: sheetW, height: sheetH, windowWidth: sheetW, windowHeight: sheetH,
-      });
-      const blob: Blob = await new Promise((res, rej) =>
-        canvas.toBlob((b) => (b ? res(b) : rej(new Error("Canvas export failed (page too large for this device?)"))), "image/jpeg", 0.92));
-      const img = await pdf.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+      progress(`Writing page ${i + 1} of ${sheets.length}…`, 0.15 + 0.8 * (i / sheets.length));
       const page = pdf.addPage([wPt, hPt]);
-      page.drawImage(img, { x: 0, y: 0, width: wPt, height: hPt });
+      await new SheetPainter(env, page).paint(sheets[i], wm);
       pages.push(page);
-      canvas.width = canvas.height = 0;
-      sheets[i].remove(); // free memory as we go
+      sheets[i].remove();
       await tick();
     }
 
@@ -358,6 +341,7 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
     return await pdf.save();
   } finally {
     root.remove();
+    fonts.unloadFromDocument();
   }
 }
 

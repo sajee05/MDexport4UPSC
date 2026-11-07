@@ -6,7 +6,10 @@ This is the mobile-friendly successor to a desktop Markdown→PDF script. It nee
 
 ## Features
 
-- **Faithful rendering** – uses Obsidian's own renderer, so LaTeX math, sub/superscripts, arrows, tables, callouts, task lists, footnotes, highlights, code blocks and Mermaid flowcharts match your note.
+- **Real PDF, not screenshots** – text is selectable and searchable, math and diagrams are vector graphics, and files stay small and sharp at any zoom.
+- **LaTeX / MathJax** – `$inline$` and `$$display$$` math is typeset by a bundled MathJax engine (AMS, `\ce{}` chemistry, `\cancel`, `\mathbb`, matrices, cases and more). Invalid formulas are left as source instead of breaking the export.
+- **Obsidian rendering for everything else** – sub/superscripts, arrows, tables, callouts, task lists, footnotes, highlights, code blocks and Mermaid flowcharts match your note.
+- **Bundled fonts** (Noto Serif/Sans/Mono, plus Devanagari) so output is identical on every device.
 - **Always light and print-ready**, whatever theme you use.
 - **Title page and clickable index** with dotted leaders and page numbers.
 - **PDF bookmarks** (outline) and working internal/external links.
@@ -32,10 +35,11 @@ This is the mobile-friendly successor to a desktop Markdown→PDF script. It nee
 
 ## Notes and limits
 
-- Pages are rendered as high-resolution images (Quality setting) so layout is identical on every device. Text in the PDF is therefore **not selectable/searchable**; links and bookmarks are real.
-- Very large documents on iPad use a lot of memory. If an export fails, lower *Quality* or export fewer chapters at a time.
-- Mermaid diagram labels are converted to plain SVG text for reliable rendering on Safari, so very long labels may not wrap.
+- Layout comes from the device's own browser engine; fonts are bundled so it is consistent across iPad and desktop.
+- Hindi (Devanagari) words are embedded as sharp images, because complex-script shaping can't be reproduced reliably in PDF text. They are not selectable. Emoji are handled the same way. Latin, Greek, Cyrillic, symbols and math are real text/vectors.
+- Mermaid diagram labels are converted to plain SVG text for reliable rendering, so very long labels may not wrap.
 - A single code block taller than one page is clipped.
+- The plugin is about 5 MB because it bundles MathJax and fonts.
 
 ## Footer
 

@@ -19,8 +19,6 @@ export interface ExportOptions {
   wmOpacity: number;
   /** px */
   wmSize: number;
-  /** raster scale: 2 = ~192 dpi, 3 = ~288 dpi */
-  quality: number;
 }
 
 export const DEFAULT_OPTIONS: ExportOptions = {
@@ -38,7 +36,6 @@ export const DEFAULT_OPTIONS: ExportOptions = {
   watermark: "",
   wmOpacity: 5,
   wmSize: 120,
-  quality: 2.5,
 };
 
 export const PAPER_MM: Record<PaperName, [number, number]> = {

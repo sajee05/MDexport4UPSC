@@ -3,6 +3,7 @@ import {
   finishRenderMath, normalizePath,
 } from "obsidian";
 import { exportPdf } from "./exporter";
+import { injectMath, preprocessMath } from "./math";
 import { computeGeometry, DEFAULT_OPTIONS, ExportOptions, MM_TO_PX, PaperName } from "./options";
 
 interface PluginSettings {
@@ -87,8 +88,10 @@ export default class MdExportUpscPlugin extends Plugin {
         title: opts.title.trim() || meta["title"] || "",
         subtitle: opts.subtitle.trim() || meta["author"] || "",
       };
-      await MarkdownRenderer.render(this.app, body, stage, file.path, comp);
+      await MarkdownRenderer.render(this.app, preprocessMath(body), stage, file.path, comp);
       await this.waitForRender(stage);
+      const badMath = injectMath(stage);
+      if (badMath) new Notice(`${badMath} formula(s) could not be typeset and were left as source.`);
       const bytes = await exportPdf(stage, eff, onProgress);
 
       const dir = this.settings.outputFolder.trim() || file.parent?.path || "";
@@ -163,8 +166,6 @@ class ExportModal extends Modal {
       d.addOptions({ "1": "1 page per sheet (portrait)", "2": "2 pages per sheet (landscape)" }).setValue(o.twoUp ? "2" : "1").onChange((v) => (o.twoUp = v === "2")));
     new Setting(contentEl).setName("Scratchpad margin (1:5)").setDesc("Blank right-hand strip for handwritten notes in GoodNotes.")
       .addToggle((t) => t.setValue(o.scratchpad).onChange((v) => (o.scratchpad = v)));
-    new Setting(contentEl).setName("Quality").setDesc("Higher is sharper but slower and larger.")
-      .addDropdown((d) => d.addOptions({ "2": "Standard", "2.5": "High", "3": "Max" }).setValue(String(o.quality)).onChange((v) => (o.quality = Number(v))));
 
     section("Watermark");
     new Setting(contentEl).setName("Text").setDesc("Diagonal watermark. Blank = none.")

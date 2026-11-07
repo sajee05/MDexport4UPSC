@@ -1,14 +1,10 @@
 import { ExportOptions, Geometry, MM_TO_PX } from "./options";
 
+import { STACK } from "./fonts";
+
 const FONTS = {
-  serif: {
-    body: "'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif",
-    heading: "Georgia,'Times New Roman',serif",
-  },
-  sans: {
-    body: "-apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif",
-    heading: "-apple-system,'Segoe UI',Arial,sans-serif",
-  },
+  serif: { body: STACK.serif, heading: STACK.serif },
+  sans: { body: STACK.sans, heading: STACK.sans },
 };
 
 /** Print stylesheet: always light, book-style, independent of the user's Obsidian theme. */
@@ -22,7 +18,7 @@ export function buildCss(o: ExportOptions, g: Geometry): string {
 .mdx-sheet{position:relative;overflow:hidden;background:#fff;color:#221f1a;font-size:16px;line-height:1.7;font-family:${f.body};}
 .mdx-col{position:absolute;}
 ${P}{overflow:hidden;display:flow-root;color:#221f1a;font-family:${f.body};font-size:16px;line-height:1.7;
-  ${o.justify ? "text-align:justify;hyphens:auto;-webkit-hyphens:auto;" : ""}overflow-wrap:break-word;word-break:break-word;padding:0;margin:0;}
+  ${o.justify ? "text-align:justify;hyphens:manual;" : ""}overflow-wrap:break-word;word-break:break-word;padding:0;margin:0;}
 ${P} p{margin:0 0 14px 0;}
 ${P} ul,${P} ol{margin:0 0 14px 0;padding-left:32px;list-style-position:outside;}
 ${P} ul ul,${P} ol ol,${P} ul ol,${P} ol ul{margin:4px 0;padding-left:28px;}
@@ -44,7 +40,8 @@ ${P} mark{background:#f5dd9a;padding:0 2px;border-radius:2px;color:#221f1a;}
 ${P} del{opacity:.65;}
 ${P} pre{background:#fbf9f4;border:1px solid #ddd3bf;border-radius:8px;padding:14px 16px;margin:20px 0;max-width:100%;white-space:pre-wrap;word-wrap:break-word;text-align:left;}
 ${P} pre code{background:transparent;padding:0;white-space:pre-wrap;color:#221f1a;}
-${P} code{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;}
+${P} pre,${P} kbd,${P} samp{font-family:${STACK.mono};}
+${P} code{font-family:${STACK.mono};font-size:13px;}
 ${P} p code,${P} li code,${P} td code{background:#efe9dc;padding:1px 5px;border-radius:3px;color:#8a3222;}
 ${P} table{width:100%;border-collapse:collapse;margin:22px 0;font-size:13.5px;table-layout:fixed;}
 ${P} th,${P} td{border:1px solid #ddd3bf;padding:9px 11px;text-align:left;overflow-wrap:break-word;word-break:break-word;vertical-align:top;}
@@ -53,8 +50,6 @@ ${P} tbody tr:nth-child(even) td{background:#faf8f2;}
 ${P} img{max-width:100%;max-height:${ph}px;height:auto;object-fit:contain;border-radius:4px;}
 ${P} svg{max-width:100%;}
 ${P} blockquote{border-left:3px solid #cabfa4;margin:18px 0;padding:4px 18px;color:#5a5346;font-style:italic;background:#f6f2e9;}
-${P} .math-block,${P} mjx-container[display="true"]{text-align:center;margin:12px 0;overflow:hidden;}
-${P} mjx-container{font-size:105%;}
 ${P} .mermaid,${P} .block-language-mermaid{background:#fffdf9;border:1px solid #ddd3bf;border-radius:8px;padding:16px;margin:20px 0;text-align:center;}
 ${P} .mermaid svg{max-width:100% !important;max-height:${ph - 40}px;height:auto !important;display:block;margin:0 auto;}
 ${P} .callout{border:1px solid rgba(var(--callout-color,68,138,255),.40);background:rgba(var(--callout-color,68,138,255),.09);
@@ -71,6 +66,14 @@ ${P} .task-list-item{list-style:none;margin-left:-22px;}
 ${P} .task-list-item input[type=checkbox]{margin-right:8px;}
 ${P} .footnotes{font-size:12.5px;color:#6b6154;border-top:1px solid #ddd3bf;margin-top:30px;padding-top:10px;}
 ${P} sup,${P} sub{line-height:0;}
+${P} *{font-family:inherit;}
+${P} pre,${P} pre *,${P} code,${P} kbd,${P} samp{font-family:${STACK.mono} !important;}
+${P} svg text,${P} svg tspan{font-family:${STACK.sans} !important;}
+${P} button,${P} .copy-code-button,${P} .edit-block-button,${P} .heading-collapse-indicator,${P} .collapse-indicator{display:none !important;}
+${P} mjx-container{display:inline-block;direction:ltr;text-indent:0;text-align:left;}
+${P} mjx-container[display="true"]{display:block;text-align:center;margin:12px 0;}
+${P} mjx-container svg{overflow:visible;max-width:100%;}
+${P} mjx-container[display="true"] svg{height:auto;}
 /* title page + index */
 .mdx-title-page{text-align:center;padding:70px 20px 46px;}
 .mdx-title{font-family:${f.heading};font-size:32px;font-weight:700;color:#221f1a;letter-spacing:.3px;margin-bottom:10px;text-align:center;}
@@ -88,11 +91,9 @@ ${P} sup,${P} sub{line-height:0;}
 .mdx-toc .pn{flex:none;min-width:2.4em;text-align:right;color:#555;font-weight:600;}
 /* sheet furniture */
 .mdx-scratch-line{position:absolute;border-left:1.5px dashed #ccc;}
-.mdx-scratch-label{position:absolute;text-align:center;font:12px Helvetica,Arial,sans-serif;color:#999;}
-.mdx-wm{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-.mdx-wm span{display:block;white-space:nowrap;transform:rotate(-45deg);font:700 ${o.wmSize}px Helvetica,Arial,sans-serif;color:rgb(128,128,128);opacity:${Math.max(1, Math.min(100, o.wmOpacity)) / 100};}
+.mdx-scratch-label{position:absolute;text-align:center;font:12px ${STACK.sans};color:#999;}
 .mdx-footer{position:absolute;left:40px;right:40px;bottom:22px;display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;
-  font:700 13px Helvetica,Arial,sans-serif;color:#666;}
+  font:700 13px ${STACK.sans};color:#666;}
 .mdx-footer .l{text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:12px;}
 .mdx-footer .c{text-align:center;}
 .mdx-footer .r{text-align:right;font-weight:600;}
