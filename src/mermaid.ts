@@ -62,8 +62,9 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
             theme: "neutral",
             fontFamily: "'MDX Sans', sans-serif",
             securityLevel: "loose",
-            flowchart: { htmlLabels: true },
+            flowchart: { htmlLabels: true, useMaxWidth: false },
             sequence: { useMaxWidth: false },
+            gantt: { useMaxWidth: false },
           });
         }
         const id = "mdx-mmd-" + Math.random().toString(36).slice(2, 9);
@@ -76,6 +77,27 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
           const container = document.createElement("div");
           container.className = "mermaid block-language-mermaid";
           container.innerHTML = svg;
+          // Normalize SVG dimensions to preserve aspect ratio
+          const svgEl = container.querySelector("svg");
+          if (svgEl) {
+            const vb = svgEl.getAttribute("viewBox");
+            if (vb) {
+              const parts = vb.trim().split(/[\s,]+/).map(Number);
+              if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                const [, , vw, vh] = parts;
+                // Lock intrinsic size from viewBox so CSS max-width/max-height scale correctly
+                svgEl.setAttribute("width", String(vw));
+                svgEl.setAttribute("height", String(vh));
+                // Remove any inline style that overrides width/height with 100%
+                const st = svgEl.getAttribute("style") || "";
+                svgEl.setAttribute("style",
+                  st.replace(/\b(max-)?width\s*:[^;]+;?/gi, "")
+                    .replace(/\b(max-)?height\s*:[^;]+;?/gi, "")
+                    .trim()
+                );
+              }
+            }
+          }
           el.replaceWith(container);
           rendered = true;
           continue;

@@ -18,7 +18,7 @@ function splittable(n: Node): n is Element {
   if (n.nodeType !== 1) return false;
   const e = n as Element;
   if (!SPLITTABLE.has(e.tagName)) return false;
-  if (e.matches(".mermaid, .block-language-mermaid, .math, mjx-container, .mdx-title-page")) return false;
+  if (e.matches(".mermaid, .block-language-mermaid, .math, mjx-container, .mdx-title-page, .callout")) return false;
   return e.childNodes.length > 0;
 }
 
@@ -105,6 +105,13 @@ export class Flow {
 
     // If it's a splittable container (list, table, blockquote, div), split its children across pages
     if (splittable(node)) {
+      if (node.nodeType === 1 && (node as Element).tagName === "TABLE" && this.placed > 0) {
+        // Attempt to fit the whole table on a new page first
+        this.breakPage(false);
+        this.parent().appendChild(node);
+        if (this.fits()) { this.placed++; return; }
+        this.parent().removeChild(node);
+      }
       this.split(node);
       return;
     }
