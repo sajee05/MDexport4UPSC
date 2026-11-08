@@ -45,6 +45,41 @@ const DEFS: FontDef[] = [
   { key: "deva-bold", family: "deva", bold: true, italic: false, data: deva_bold },
 ];
 
+function uint8ToBase64(u8: Uint8Array): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength).toString("base64");
+  }
+  let binary = "";
+  const len = u8.byteLength;
+  const chunk = 0x8000;
+  for (let i = 0; i < len; i += chunk) {
+    binary += String.fromCharCode.apply(null, u8.subarray(i, Math.min(i + chunk, len)) as any);
+  }
+  return btoa(binary);
+}
+
+let cachedFontFaceCss = "";
+
+export function getFontFaceCss(): string {
+  if (cachedFontFaceCss) return cachedFontFaceCss;
+  const rules: string[] = [];
+  for (const d of DEFS) {
+    const fam = CSS_FAMILY[d.family];
+    const weight = d.bold ? "700" : "400";
+    const style = d.italic ? "italic" : "normal";
+    const b64 = uint8ToBase64(d.data);
+    rules.push(`@font-face {
+  font-family: '${fam}';
+  font-weight: ${weight};
+  font-style: ${style};
+  font-display: block;
+  src: url('data:font/truetype;charset=utf-8;base64,${b64}') format('truetype');
+}`);
+  }
+  cachedFontFaceCss = rules.join("\n");
+  return cachedFontFaceCss;
+}
+
 /** A font usable both for browser layout (FontFace) and PDF embedding. */
 export class PFont {
   pdf!: PDFFont;

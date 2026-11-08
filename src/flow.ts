@@ -103,6 +103,12 @@ export class Flow {
     if (this.fits()) { this.placed++; return; }
     par.removeChild(node);
 
+    // If it's a splittable container (list, table, blockquote, div), split its children across pages
+    if (splittable(node)) {
+      this.split(node);
+      return;
+    }
+
     if (this.placed > 0) {
       this.breakPage(true);
       this.parent().appendChild(node);
@@ -110,10 +116,6 @@ export class Flow {
       this.parent().removeChild(node);
     }
 
-    if (splittable(node)) {
-      this.split(node);
-      return;
-    }
     // Atomic and taller than a page: keep it, the page clips it.
     this.parent().appendChild(node);
     this.placed++;
@@ -137,11 +139,18 @@ export class Flow {
     if (lvl.el && lvl.el.childNodes.length <= (lvl.head ? 1 : 0)) lvl.el.remove();
   }
 
-  /** Drop a trailing blank page. */
+  /** Drop any empty or blank pages. */
   finish(): HTMLElement[] {
-    if (this.pages.length > 1 && this.placed === 0) {
-      this.pages.pop()!.remove();
+    const validPages: HTMLElement[] = [];
+    for (const p of this.pages) {
+      const hasContent = (p.textContent || "").trim().length > 0 || p.querySelector("svg, img, input, table, hr") !== null;
+      if (hasContent) {
+        validPages.push(p);
+      } else {
+        p.remove();
+      }
     }
+    this.pages = validPages;
     return this.pages;
   }
 }

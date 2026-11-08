@@ -133,6 +133,19 @@ export async function exportPdf(content: HTMLElement, opts: ExportOptions, progr
   root.appendChild(style);
   document.body.appendChild(root);
 
+  // Allow browser to parse bundled @font-face so DOM layout matches embedded vector fonts exactly
+  try {
+    if (document.fonts) {
+      await Promise.race([
+        Promise.all([
+          document.fonts.load(`16px '${opts.font === "serif" ? "MDX Serif" : "MDX Sans"}'`),
+          document.fonts.load("16px 'MDX Mono'"),
+        ]),
+        new Promise<void>((r) => setTimeout(r, 400)),
+      ]);
+    }
+  } catch { /* ignore */ }
+
   try {
     await progress("Preparing content…", 0.02);
     // Expand collapsible callouts and HTML disclosure elements so their contents appear in the PDF

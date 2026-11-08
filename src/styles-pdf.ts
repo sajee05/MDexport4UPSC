@@ -1,5 +1,5 @@
 import { ExportOptions, Geometry, MM_TO_PX } from "./options";
-import { STACK } from "./fonts";
+import { STACK, getFontFaceCss } from "./fonts";
 
 const FONTS = {
   serif: { body: STACK.serif, heading: STACK.serif },
@@ -12,6 +12,7 @@ export function buildCss(o: ExportOptions, g: Geometry): string {
   const ph = Math.floor(g.contentHmm * MM_TO_PX) - 12;
   const P = ".mdx-pbody";
   return `
+${getFontFaceCss()}
 .mdx-root{position:fixed;left:0;top:0;z-index:-1;pointer-events:none;}
 .mdx-root *{box-sizing:border-box;}
 .mdx-sheet{position:relative;overflow:hidden;background:#fff;color:#221f1a;font-size:16px;line-height:1.7;font-family:${f.body};}
@@ -85,8 +86,19 @@ ${P} .callout.is-collapsed .callout-content{display:block !important;}
 ${P} .callout-content>*:last-child{margin-bottom:0;}
 ${P} .markdown-embed{border:none;padding:0;margin:0;}
 ${P} .markdown-embed-title,${P} .markdown-embed-link{display:none;}
-${P} .task-list-item{list-style:none;margin-left:-22px;}
-${P} .task-list-item input[type=checkbox]{margin-right:8px;}
+${P} .task-list-item,${P} li[data-task]{list-style:none !important;margin-left:-20px;}
+${P} .task-list-item input[type=checkbox],${P} li[data-task] input[type=checkbox]{
+  width:14px !important;
+  height:14px !important;
+  min-width:14px !important;
+  min-height:14px !important;
+  margin:0 8px 0 0 !important;
+  vertical-align:middle !important;
+  position:relative;
+  top:-1px;
+  background:transparent !important;
+  border:none !important;
+}
 ${P} .footnotes{font-size:12.5px;color:#6b6154;border-top:1px solid #ddd3bf;margin-top:30px;padding-top:10px;}
 ${P} .footnotes ol{padding-left:20px;}
 ${P} .footnotes li{margin-bottom:4px;}
@@ -109,13 +121,13 @@ ${P} .mdx-math-fallback{font-family:${STACK.mono};font-size:12px;color:#8a3222;b
 .mdx-title{font-family:${f.heading};font-size:32px;font-weight:700;color:#221f1a;letter-spacing:.3px;margin-bottom:10px;text-align:center;}
 .mdx-subtitle{font-size:15px;color:#7a7264;font-style:italic;text-align:center;}
 .mdx-title-rule{width:56px;height:2px;background:#b8934a;margin:24px auto;border-radius:1px;}
-.mdx-toc{border-top:2px solid #2c3e50;border-bottom:2px solid #2c3e50;padding:25px;margin-bottom:10px;background:#fff;text-align:left;}
-.mdx-toc .toctitle{display:block;text-align:center;font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:3px;margin-bottom:20px;color:#2c3e50;}
+.mdx-toc{border-top:1.5px solid #2c3e50;border-bottom:1.5px solid #2c3e50;padding:16px 20px;margin-bottom:10px;background:#fff;text-align:left;}
+.mdx-toc .toctitle{display:block;text-align:center;font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;color:#2c3e50;}
 .mdx-toc ul{list-style:none;padding:0;margin:0;}
-.mdx-toc li{margin:0 0 7px;line-height:1.5;}
-.mdx-toc a{display:flex;align-items:baseline;text-decoration:none;color:#2980b9;font-weight:700;font-size:15px;border:none;}
-.mdx-toc li.l2 a{font-weight:500;color:#555;font-size:13.5px;margin-left:22px;}
-.mdx-toc li.l3 a{font-weight:500;color:#666;font-size:13px;margin-left:44px;}
+.mdx-toc li{margin:0 0 3px;line-height:1.35;}
+.mdx-toc a{display:flex;align-items:baseline;text-decoration:none;color:#2980b9;font-weight:700;font-size:13.5px;border:none;}
+.mdx-toc li.l2 a{font-weight:500;color:#555;font-size:12.5px;margin-left:18px;}
+.mdx-toc li.l3 a{font-weight:500;color:#666;font-size:12px;margin-left:36px;}
 .mdx-toc .t{flex:0 1 auto;}
 .mdx-toc .lead{flex:1 1 auto;min-width:12px;margin:0 6px;border-bottom:1px dotted #b7ac96;transform:translateY(-3px);}
 .mdx-toc .pn{flex:none;min-width:2.4em;text-align:right;color:#555;font-weight:600;}

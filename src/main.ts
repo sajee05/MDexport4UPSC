@@ -23,16 +23,19 @@ const DEFAULT_SETTINGS: PluginSettings = {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function splitFrontmatter(text: string): { body: string; meta: Record<string, string> } {
-  const m = text.match(/^---\s*\n([\s\S]*?\n)---\s*\n?/);
+  const clean = text.replace(/^\uFEFF/, "");
+  const m = clean.match(/^[\s\r\n]*---\s*\r?\n([\s\S]*?\r?\n)---\s*(?:\r?\n)?/);
   const meta: Record<string, string> = {};
-  if (!m) return { body: text, meta };
-  for (const line of m[1].split("\n")) {
+  if (!m) return { body: clean, meta };
+  for (const rawLine of m[1].split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
     const i = line.indexOf(":");
-    if (i > 0 && !line.trim().startsWith("#")) {
+    if (i > 0) {
       meta[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim().replace(/^["']|["']$/g, "");
     }
   }
-  return { body: text.slice(m[0].length), meta };
+  return { body: clean.slice(m[0].length), meta };
 }
 
 export default class MdExportUpscPlugin extends Plugin {

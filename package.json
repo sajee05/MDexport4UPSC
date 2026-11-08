@@ -1,6 +1,6 @@
 {
   "name": "md-export-for-upsc",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Export Obsidian notes to book-style PDFs (math, callouts, diagrams, TOC, scratchpad margin) on iPad, iPhone and desktop.",
   "main": "main.js",
   "scripts": {

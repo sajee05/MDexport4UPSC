@@ -71,6 +71,10 @@ export class SheetPainter {
   private glyphCache = new Map<string, PDFImage | null>();
   private famCache = new Map<string, "serif" | "sans" | "mono">();
   private fontPick = new Map<string, PFont | null>();
+  private lastBlockEl: Element | null = null;
+  private lastWordRightPt = -Infinity;
+  private lastWordLeftPt = -Infinity;
+  private lastWordTop = -Infinity;
 
   constructor(private env: PaintEnv, private page: PDFPage) {}
 
@@ -218,6 +222,7 @@ export class SheetPainter {
 
   /* ---------- boxes ---------- */
   private paintBox(el: Element, cs: CSSStyleDeclaration, op: number) {
+    if (el.tagName === "INPUT" && (el as HTMLInputElement).type === "checkbox") return;
     const bg = parseColor(cs.backgroundColor);
     const bw = [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth].map((v) => parseFloat(v) || 0);
     const bst = [cs.borderTopStyle, cs.borderRightStyle, cs.borderBottomStyle, cs.borderLeftStyle];
@@ -269,8 +274,9 @@ export class SheetPainter {
   private paintCheckbox(cb: HTMLInputElement, op: number) {
     const r = cb.getBoundingClientRect();
     if (r.width < 2) return;
+    const isChecked = cb.checked || cb.hasAttribute("checked") || (cb as any).defaultChecked;
     const box = roundRectSegs(r.left + 0.5, r.top + 0.5, r.width - 1, r.height - 1, 3, 3);
-    if (cb.checked) {
+    if (isChecked) {
       this.drawClientPath(box, { r: 0.17, g: 0.37, b: 0.54, a: 1 }, op);
       const w = r.width, h = r.height;
       this.drawClientPath([["M", r.left + w * 0.25, r.top + h * 0.52], ["L", r.left + w * 0.43, r.top + h * 0.7], ["L", r.left + w * 0.76, r.top + h * 0.3]],
@@ -354,12 +360,17 @@ export class SheetPainter {
     const deco = this.decoration(el, cs);
     const rng = document.createRange();
     const sizePt = sizePx * this.env.kx;
-    const draw = (str: string, f: PFont, r: DOMRect) => {
-      this.page.drawText(str, {
-        x: this.X(r.left), y: this.Y(r.top + f.baselineOffset(sizePx)), size: sizePt, font: f.pdf,
-        color: rgb(color.r, color.g, color.b), opacity: op * color.a,
-      });
-    };
+
+    const inSvg = !!el.closest("svg");
+    const elBox = inSvg ? el.getBoundingClientRect() : null;
+
+    const blockEl = inSvg ? el : (el.closest("p, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, .callout-content, .toctitle") || el);
+    if (blockEl !== this.lastBlockEl) {
+      this.lastBlockEl = blockEl;
+      this.lastWordRightPt = -Infinity;
+      this.lastWordLeftPt = -Infinity;
+      this.lastWordTop = -Infinity;
+    }
 
     const re = /\S+/g;
     let m: RegExpExecArray | null;
@@ -381,25 +392,75 @@ export class SheetPainter {
       const fonts: (PFont | null)[] = [];
       for (const c of chars) fonts.push(await this.fontFor(c.s.codePointAt(0)!, fam, bold, italic));
       const same = fonts[0] && fonts.every((f) => f === fonts[0]);
+
+      let r = rects[0];
+      let rTop = r.top;
+      if (elBox && Math.abs(rTop - elBox.top) > sizePx * 0.75) {
+        rTop = elBox.top + (r.top - (rects[0]?.top ?? r.top));
+      }
+
+      const isSameLine = Math.abs(rTop - this.lastWordTop) < sizePx * 0.5 && this.X(r.left) >= this.lastWordLeftPt - 2;
+      if (!isSameLine) {
+        this.lastWordRightPt = -Infinity;
+        this.lastWordTop = rTop;
+        this.lastWordLeftPt = this.X(r.left);
+      }
+
+      const minSpacePt = sizePt * 0.22;
+      const measuredX = this.X(r.left);
+      const startX = (!inSvg && this.lastWordRightPt > -Infinity)
+        ? Math.max(measuredX, this.lastWordRightPt + minSpacePt)
+        : measuredX;
+
+      const wordStr = chars.map((c) => c.s).join("");
+      const f = fonts[0] || (await this.env.fonts.get(this.env.pdf, fam, bold, italic));
+      const wordWidthPt = f.pdf.widthOfTextAtSize(wordStr, sizePt);
+
       if (rects.length === 1 && ls === 0 && same) {
-        draw(chars.map((c) => c.s).join(""), fonts[0]!, rects[0]);
+        this.page.drawText(wordStr, {
+          x: startX,
+          y: this.Y(rTop + f.baselineOffset(sizePx)),
+          size: sizePt,
+          font: f.pdf,
+          color: rgb(color.r, color.g, color.b),
+          opacity: op * color.a,
+        });
       } else {
+        let curX = startX;
         for (let i = 0; i < chars.length; i++) {
-          rng.setStart(node, start + chars[i].off); rng.setEnd(node, start + chars[i].off + chars[i].s.length);
-          const r = Array.from(rng.getClientRects()).find((q) => q.width > 0.01 && q.height > 0.01);
-          if (!r) continue;
-          const f = fonts[i];
-          if (f) draw(chars[i].s, f, r);
-          else await this.drawBitmap(chars[i].s, cs, sizePx, r, op, color);
+          const cf = fonts[i];
+          const chStr = chars[i].s;
+          if (cf) {
+            this.page.drawText(chStr, {
+              x: curX,
+              y: this.Y(rTop + cf.baselineOffset(sizePx)),
+              size: sizePt,
+              font: cf.pdf,
+              color: rgb(color.r, color.g, color.b),
+              opacity: op * color.a,
+            });
+            curX += cf.pdf.widthOfTextAtSize(chStr, sizePt);
+          } else {
+            await this.drawBitmap(chStr, cs, sizePx, r, op, color);
+            curX += sizePt * 0.5;
+          }
         }
       }
+
+      if (!inSvg) {
+        this.lastWordRightPt = startX + wordWidthPt;
+        this.lastWordLeftPt = startX;
+        this.lastWordTop = rTop;
+      }
+
       if (deco.underline || deco.line) {
-        for (const r of rects) {
+        for (const dr of rects) {
           const th = Math.max(0.6, sizePx * 0.06);
           const f = fonts[0] || (await this.env.fonts.get(this.env.pdf, fam, bold, italic));
-          const base = r.top + f.baselineOffset(sizePx);
-          if (deco.underline) this.drawClientPath([["M", r.left, base + sizePx * 0.1], ["L", r.right, base + sizePx * 0.1], ["L", r.right, base + sizePx * 0.1 + th], ["L", r.left, base + sizePx * 0.1 + th], ["Z"]], color, op);
-          if (deco.line) this.drawClientPath([["M", r.left, base - sizePx * 0.3], ["L", r.right, base - sizePx * 0.3], ["L", r.right, base - sizePx * 0.3 + th], ["L", r.left, base - sizePx * 0.3 + th], ["Z"]], color, op);
+          const base = rTop + f.baselineOffset(sizePx);
+          const xL = startX, xR = startX + wordWidthPt;
+          if (deco.underline) this.drawClientPath([["M", xL, base + sizePx * 0.1], ["L", xR, base + sizePx * 0.1], ["L", xR, base + sizePx * 0.1 + th], ["L", xL, base + sizePx * 0.1 + th], ["Z"]], color, op);
+          if (deco.line) this.drawClientPath([["M", xL, base - sizePx * 0.3], ["L", xR, base - sizePx * 0.3], ["L", xR, base - sizePx * 0.3 + th], ["L", xL, base - sizePx * 0.3 + th], ["Z"]], color, op);
         }
       }
     }

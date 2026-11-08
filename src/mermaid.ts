@@ -62,6 +62,8 @@ export async function renderRemainingMermaid(stage: HTMLElement): Promise<void> 
             theme: "neutral",
             fontFamily: "'MDX Sans', sans-serif",
             securityLevel: "loose",
+            flowchart: { htmlLabels: true },
+            sequence: { useMaxWidth: false },
           });
         }
         const id = "mdx-mmd-" + Math.random().toString(36).slice(2, 9);
